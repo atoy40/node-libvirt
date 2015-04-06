@@ -11,7 +11,7 @@ NAN_METHOD(Domain::name) {                                                      
                                                                             \
   Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());                 \
                                                                             \
-  if (args.Length() == 1 && !args[0]->IsFunction()) {                       \
+  if (args.Length() != 1 || !args[0]->IsFunction()) {                       \
     return ThrowException(Exception::TypeError(                             \
     String::New("You must specify a function as first argument")));         \
   }                                                                         \
@@ -389,7 +389,7 @@ namespace NodeLibvirt {
     }
 
     NAN_METHOD(Domain::Create) {
-        HandleScope scope;
+        NanScope();
         unsigned int flags = 0;
 
         int argsl = args.Length();
@@ -443,7 +443,7 @@ namespace NodeLibvirt {
     }
 
     NAN_METHOD(Domain::Define) {
-        HandleScope scope;
+        NanScope();
         unsigned int flags = 0;
 
         int argsl = args.Length();
@@ -942,7 +942,7 @@ namespace NodeLibvirt {
     }
 
     NAN_METHOD(Domain::Save) {
-        HandleScope scope;
+        NanScope();
 
         if(args.Length() != 2 || !args[0]->IsString()) {
             return ThrowException(Exception::TypeError(
@@ -976,7 +976,7 @@ namespace NodeLibvirt {
     }
 
     NAN_METHOD(Domain::Restore) {
-        HandleScope scope;
+        NanScope();
 
         if(args.Length() != 2 || !args[0]->IsString()) {
             return ThrowException(Exception::TypeError(
@@ -1160,7 +1160,7 @@ namespace NodeLibvirt {
     }
 
     NAN_METHOD(Domain::SetVcpus) {
-        HandleScope scope;
+        NanScope();
 
         if(args.Length() != 2 || !args[0]->IsInt32()) {
             return ThrowException(Exception::TypeError(
@@ -1309,7 +1309,8 @@ namespace NodeLibvirt {
     }
 
     NAN_METHOD(Domain::SetMigrationMaxDowntime) {
-        HandleScope scope;
+        NanScope();
+
         long long downtime = 0;
         unsigned int flags = 0;
 
@@ -1390,6 +1391,8 @@ namespace NodeLibvirt {
     }
 
     NAN_METHOD(Domain::PinVcpu) {
+        NanScope();
+
         if(args.Length() < 2) {
             return ThrowException(Exception::TypeError(
             String::New("You must specify two arguments")));
@@ -1437,7 +1440,8 @@ namespace NodeLibvirt {
     }
 
     NAN_METHOD(Domain::AttachDevice) {
-        HandleScope scope;
+        NanScope();
+
         unsigned int flags = 0;
 
         int argsl = args.Length();
@@ -1501,7 +1505,8 @@ namespace NodeLibvirt {
     }
 
     NAN_METHOD(Domain::DetachDevice) {
-        HandleScope scope;
+        NanScope();
+
         unsigned int flags = 0;
 
         int argsl = args.Length();
@@ -1561,7 +1566,8 @@ namespace NodeLibvirt {
     }
 
     NAN_METHOD(Domain::UpdateDevice) {
-        HandleScope scope;
+        NanScope();
+
         unsigned int flags = 0;
 
         int argsl = args.Length();
@@ -1661,137 +1667,175 @@ namespace NodeLibvirt {
         NanReturnUndefined();
     }
 
-    Handle<Value> Domain::GetJobInfo(const Arguments& args) {
-        HandleScope scope;
-        virDomainJobInfo info_;
-        int ret = -1;
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        ret = virDomainGetJobInfo(domain->domain_, &info_);
-
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
+    void DomainGetJobInfoWorker::Execute() {
+        if(virDomainGetJobInfo(getDomainPtr(), &info_) == -1) {
+            setVirError(virGetLastError());
         }
+    }
 
-        Local<Object> info = Object::New();
-        info->Set(type_symbol, Integer::New(info_.type));
+    void DomainGetJobInfoWorker::HandleOKCallback() {
+        NanScope();
+
+        Local<Object> info = NanNew<Object>();
+        info->Set(type_symbol, NanNew<Integer>(info_.type));
 
         //time
-        Local<Object> time = Object::New();
-        time->Set(elapsed_symbol, Number::New(info_.timeElapsed));
-        time->Set(remaining_symbol, Number::New(info_.timeRemaining));
+        Local<Object> time = NanNew<Object>();
+        time->Set(elapsed_symbol, NanNew<Number>(info_.timeElapsed));
+        time->Set(remaining_symbol, NanNew<Number>(info_.timeRemaining));
 
         //data
-        Local<Object> data = Object::New();
-        data->Set(total_symbol, Number::New(info_.dataTotal));
-        data->Set(processed_symbol, Number::New(info_.dataProcessed));
-        data->Set(remaining_symbol, Number::New(info_.dataRemaining));
+        Local<Object> data = NanNew<Object>();
+        data->Set(total_symbol, NanNew<Number>(info_.dataTotal));
+        data->Set(processed_symbol, NanNew<Number>(info_.dataProcessed));
+        data->Set(remaining_symbol, NanNew<Number>(info_.dataRemaining));
 
         //memory
-        Local<Object> memory = Object::New();
-        memory->Set(total_symbol, Number::New(info_.memTotal));
-        memory->Set(processed_symbol, Number::New(info_.memProcessed));
-        memory->Set(remaining_symbol, Number::New(info_.memRemaining));
+        Local<Object> memory = NanNew<Object>();
+        memory->Set(total_symbol, NanNew<Number>(info_.memTotal));
+        memory->Set(processed_symbol, NanNew<Number>(info_.memProcessed));
+        memory->Set(remaining_symbol, NanNew<Number>(info_.memRemaining));
 
         //file
-        Local<Object> file = Object::New();
-        file->Set(total_symbol, Number::New(info_.fileTotal));
-        file->Set(processed_symbol, Number::New(info_.fileProcessed));
-        file->Set(remaining_symbol, Number::New(info_.fileRemaining));
+        Local<Object> file = NanNew<Object>();
+        file->Set(total_symbol, NanNew<Number>(info_.fileTotal));
+        file->Set(processed_symbol, NanNew<Number>(info_.fileProcessed));
+        file->Set(remaining_symbol, NanNew<Number>(info_.fileRemaining));
 
         info->Set(time_symbol, time);
         info->Set(data_symbol, data);
         info->Set(memory_symbol, memory);
         info->Set(file_symbol, file);
 
-        return scope.Close(info);
+        Local<Value> argv[] = { NanNull(), info };
+
+        callback->Call(2, argv);
     }
 
-    Handle<Value> Domain::AbortCurrentJob(const Arguments& args) {
-        HandleScope scope;
-        int ret = -1;
+    NAN_METHOD(Domain::GetJobInfo) {
+        NanScope();
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-        ret = virDomainAbortJob(domain->domain_);
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
+        if(args.Length() != 1 || !args[0]->IsFunction()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a function as first argument to invoke this function")));
         }
 
-        return True();
-    }
-
-    Handle<Value> Domain::GetSchedType(const Arguments& args) {
-        HandleScope scope;
-        return Undefined();
-    }
-
-    Handle<Value> Domain::GetSchedParams(const Arguments& args) {
-        HandleScope scope;
-        int nparams = 0;
-        int ret = -1;
-        char *type = NULL;
-        virSchedParameterPtr params_;
-
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-        type = virDomainGetSchedulerType(domain->domain_, &nparams);
 
-        if(type == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
+        NanCallback *callback = new NanCallback(args[0].As<Function>());
+
+        NanAsyncQueueWorker(new DomainGetJobInfoWorker(callback, domain->domain_));
+
+        NanReturnUndefined();
+    }
+
+    void DomainAbortCurrentJobWorker::Execute() {
+        if(virDomainAbortJob(getDomainPtr()) == -1) {
+            setVirError(virGetLastError());
+        }
+    }
+
+    NOARGS_WORKER_METHOD(AbortCurrentJob, DomainAbortCurrentJobWorker)
+
+    NAN_METHOD(Domain::GetSchedType) {
+        NanScope();
+        NanReturnUndefined();
+    }
+
+    void DomainGetSchedParamsWorker::Execute() {
+        int nparams = 0;
+        char *type = NULL;
+
+        type = virDomainGetSchedulerType(getDomainPtr(), &nparams);
+        if (type == NULL) {
+            setVirError(virGetLastError());
+            return;
         }
         free(type);
 
-        params_ = (virSchedParameterPtr) malloc(sizeof(*params_) * nparams);
+        params_.resize(nparams);
 
-        if(params_ == NULL) {
-            LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
-            return Null();
+        if(virDomainGetSchedulerParameters(getDomainPtr(), params_.data(), &nparams) == -1) {
+            setVirError(virGetLastError());
         }
-        memset(params_, 0, sizeof(*params_) * nparams);
+    }
 
-        ret = virDomainGetSchedulerParameters(domain->domain_, params_, &nparams);
+    void DomainGetSchedParamsWorker::HandleOKCallback() {
+        NanScope();
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            free(params_);
-            return Null();
-        }
+        Local<Object> params = NanNew<Object>();
 
-        Local<Object> params = Object::New();
-
-        for(int i = 0; i < nparams; i++) {
+        for (std::vector<virSchedParameter>::iterator it = params_.begin() ; it != params_.end(); ++it) {
             Local<Value> value = Local<Value>::New(Null());
 
-            switch(params_[i].type) {
+            switch(it->type) {
                 case VIR_DOMAIN_SCHED_FIELD_INT:
-                    value = Integer::New(params_[i].value.i);
+                    value = NanNew<Integer>(it->value.i);
                     break;
                 case VIR_DOMAIN_SCHED_FIELD_UINT:
-                    value = Integer::New(params_[i].value.ui);
+                    value = NanNew<Integer>(it->value.ui);
                     break;
                 case VIR_DOMAIN_SCHED_FIELD_LLONG:
-                    value = Number::New(params_[i].value.l);
+                    value = NanNew<Number>(it->value.l);
                     break;
                 case VIR_DOMAIN_SCHED_FIELD_ULLONG:
-                    value = Number::New(params_[i].value.ul);
+                    value = NanNew<Number>(it->value.ul);
                     break;
                 case VIR_DOMAIN_SCHED_FIELD_DOUBLE:
-                    value = Number::New(params_[i].value.d);
+                    value = NanNew<Number>(it->value.d);
                     break;
                 case VIR_DOMAIN_SCHED_FIELD_BOOLEAN:
-                    value = Integer::New(params_[i].value.b);
+                    value = NanNew<Integer>(it->value.b);
                     break;
             }
 
-            params->Set(String::New(params_[i].field), value);
+            params->Set(String::New(it->field), value);
         }
-        free(params_);
 
-        return scope.Close(params);
+        Local<Value> argv[] = { NanNull(), params };
+
+        callback->Call(2, argv);
     }
+
+    NOARGS_WORKER_METHOD(GetSchedParams, DomainGetSchedParamsWorker)
+
+    DomainSetSchedParamsWorker::DomainSetSchedParamsWorker(NanCallback *callback, virDomainPtr domainptr, Handle<Object> newparams)
+    : DomainWorker(callback, domainptr), newparams_(newparams->GetOwnPropertyNames()->Length()) {
+        for (std::vector<virSchedParameter>::iterator it = newparams_.begin() ; it != newparams_.end(); ++it) {
+            //Local<Value> value = newparams->Get(field);
+        }
+    }
+
+    void DomainSetSchedParamsWorker::Execute() {
+        int nparams = 0;
+        char *type = NULL;
+
+        type = virDomainGetSchedulerType(getDomainPtr(), &nparams);
+        if (type == NULL) {
+            setVirError(virGetLastError());
+            return;
+        }
+        free(type);
+
+    }
+
+    /*NAN_METHOD(Domain::SetSchedParams) {
+        NanScope();
+
+        if(args.Length() != 2 || !args[0]->IsObject()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify an object as first argument to invoke this function")));
+        }
+
+        if(!args[1]->IsFunction()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify an function as second argument")));
+        }
+
+        Local<Object> newparams = args[0]->ToObject();
+
+        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+    }*/
 
     Handle<Value> Domain::SetSchedParams(const Arguments& args) {
         HandleScope scope;
@@ -1872,89 +1916,91 @@ namespace NodeLibvirt {
         return True();
     }
 
-    Handle<Value> Domain::GetSecurityLabel(const Arguments& args) {
-        HandleScope scope;
-        virSecurityLabel label_;
-        int ret = -1;
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
+    void DomainGetSecurityLabelWorker::Execute() {
         memset(&label_, 0, sizeof label_);
-        ret = virDomainGetSecurityLabel(domain->domain_, &label_);
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
+        if(virDomainGetSecurityLabel(getDomainPtr(), &label_) == -1) {
+            setVirError(virGetLastError());
         }
-
-        Local<Object> label = Object::New();
-        label->Set(label_symbol, String::New(label_.label));
-        label->Set(enforcing_symbol, Boolean::New(label_.enforcing));
-
-        return scope.Close(label);
     }
 
-    Handle<Value> Domain::SaveManagedImage(const Arguments& args) {
-        HandleScope scope;
+    void DomainGetSecurityLabelWorker::HandleOKCallback() {
+        NanScope();
+
+        Local<Object> label = NanNew<Object>();
+        label->Set(label_symbol, NanNew<String>(label_.label));
+        label->Set(enforcing_symbol, NanNew<Boolean>(label_.enforcing));
+
+        Local<Value> argv[] = { NanNull(), label };
+
+        callback->Call(2, argv);
+    }
+
+    NOARGS_WORKER_METHOD(GetSecurityLabel, DomainGetSecurityLabelWorker)
+
+    void DomainSaveManagedImageWorker::Execute() {
+        unsigned int flags = 0;
+
+        if(virDomainManagedSave(getDomainPtr(), flags) == -1) {
+            setVirError(virGetLastError());
+        }
+    }
+
+    NOARGS_WORKER_METHOD(SaveManagedImage, DomainSaveManagedImageWorker)
+
+    void DomainRemoveManagedImageWorker::Execute() {
+        unsigned int flags = 0;
+
+        if(virDomainManagedSaveRemove(getDomainPtr(), flags) == -1) {
+            setVirError(virGetLastError());
+        }
+    }
+
+    NOARGS_WORKER_METHOD(RemoveManagedImage, DomainRemoveManagedImageWorker)
+
+    void DomainHasManagedImageWorker::Execute() {
         unsigned int flags = 0;
         int ret = -1;
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        ret = virDomainManagedSave(domain->domain_, flags);
+        ret = virDomainHasManagedSaveImage(getDomainPtr(), flags);
 
         if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
+            setVirError(virGetLastError());
+            return;
         }
 
-        return True();
+        setVal(ret == 1 ? true : false);
     }
 
-    Handle<Value> Domain::RemoveManagedImage(const Arguments& args) {
-        HandleScope scope;
+    NOARGS_WORKER_METHOD(HasManagedImage, DomainHasManagedImageWorker)
+
+    void DomainMemoryPeekWorker::Execute() {
+        if(virDomainMemoryPeek(getDomainPtr(), start_, size_ , buffer_.data(), flags_) == -1) {
+            setVirError(virGetLastError());
+        }
+    }
+
+    void DomainMemoryPeekWorker::HandleOKCallback() {
+        NanScope();
+
+        Local<Object> buffer = NanNewBufferHandle(buffer_.data(), size_);
+
+        Local<Value> argv[] = { NanNull(), buffer };
+
+        callback->Call(2, argv);
+    }
+
+
+    NAN_METHOD(Domain::MemoryPeek) {
+        NanScope();
+
         unsigned int flags = 0;
-        int ret = -1;
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        ret = virDomainManagedSaveRemove(domain->domain_, flags);
-
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
-
-        return True();
-    }
-
-    Handle<Value> Domain::HasManagedImage(const Arguments& args) {
-        HandleScope scope;
-        unsigned int flags = 0;
-        int ret = -1;
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        ret = virDomainHasManagedSaveImage(domain->domain_, flags);
-
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
-
-        return scope.Close(Boolean::New(ret));
-    }
-
-    Handle<Value> Domain::MemoryPeek(const Arguments& args) {
-        HandleScope scope;
         unsigned long long start = 0;
-		size_t size = 0;
-		char * buffer_ = NULL;
-		unsigned int flags = 0;
+        size_t size = 0;
 
-        if(args.Length() < 3) {
+        if(args.Length() < 4) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify three arguments to invoke this function")));
+            String::New("You must specify four arguments to invoke this function")));
         }
 
         if(!args[0]->IsNumber() || !args[1]->IsNumber()) {
@@ -1965,6 +2011,11 @@ namespace NodeLibvirt {
         if(!args[2]->IsArray()) {
             return ThrowException(Exception::TypeError(
             String::New("You must specify an array in the third argument")));
+        }
+
+        if(!args[3]->IsFunction()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a function in the fourth argument")));
         }
 
         start = args[0]->NumberValue();
@@ -1978,85 +2029,88 @@ namespace NodeLibvirt {
             flags |= flags_->Get(Integer::New(i))->Int32Value();
         }
 
-        buffer_ = (char*) malloc(size);
-
-        if(buffer_ == NULL) {
-            LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
-            return Null();
-        }
-
-        memset(buffer_, 0, size);
-
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        int ret = virDomainMemoryPeek(domain->domain_, start, size, buffer_, flags);
+        NanCallback *callback = new NanCallback(args[3].As<Function>());
 
-        if(ret == -1) {
-            free(buffer_);
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+        NanAsyncQueueWorker(new DomainMemoryPeekWorker(callback, domain->domain_, start, size, flags));
 
-        Buffer *buffer = Buffer::New(size);
-        memcpy(Buffer::Data(buffer), buffer_, size);
-        free(buffer_);
-
-        return scope.Close(buffer->handle_);
+        NanReturnUndefined();
     }
 
-    Handle<Value> Domain::GetMemoryStats(const Arguments& args) {
-        HandleScope scope;
+    void DomainGetMemoryStatsWorker::Execute() {
         unsigned int nr_stats = 0;
         unsigned int flags = 0;
-        virDomainMemoryStatStruct stats_[VIR_DOMAIN_MEMORY_STAT_NR];
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        nr_stats = virDomainMemoryStats(domain->domain_, stats_,
+        nr_stats = virDomainMemoryStats(getDomainPtr(), stats_.data(),
                                     VIR_DOMAIN_MEMORY_STAT_NR, flags);
 
         if(nr_stats == -1u) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
+            setVirError(virGetLastError());
         }
+    }
 
-        Local<Object> stats = Object::New();
+    void DomainGetMemoryStatsWorker::HandleOKCallback() {
+        NanScope();
 
-        for(unsigned int i = 0; i < nr_stats; i++) {
-            switch (stats_[i].tag) {
+        Local<Object> stats = NanNew<Object>();
+
+        for (std::vector<virDomainMemoryStatStruct>::iterator it = stats_.begin() ; it != stats_.end(); ++it) {
+            switch (it->tag) {
                 case VIR_DOMAIN_MEMORY_STAT_SWAP_IN:
-                    stats->Set(memory_stat_swap_in_symbol, Number::New(stats_[i].val));
+                    stats->Set(memory_stat_swap_in_symbol, NanNew<Number>(it->val));
                     break;
                 case VIR_DOMAIN_MEMORY_STAT_SWAP_OUT:
-                    stats->Set(memory_stat_swap_out_symbol, Number::New(stats_[i].val));
+                    stats->Set(memory_stat_swap_out_symbol, NanNew<Number>(it->val));
                     break;
                 case VIR_DOMAIN_MEMORY_STAT_MAJOR_FAULT:
-                    stats->Set(memory_stat_major_fault_symbol, Number::New(stats_[i].val));
+                    stats->Set(memory_stat_major_fault_symbol, NanNew<Number>(it->val));
                     break;
                 case VIR_DOMAIN_MEMORY_STAT_MINOR_FAULT:
-                    stats->Set(memory_stat_minor_fault_symbol, Number::New(stats_[i].val));
+                    stats->Set(memory_stat_minor_fault_symbol, NanNew<Number>(it->val));
                     break;
                 case VIR_DOMAIN_MEMORY_STAT_UNUSED:
-                    stats->Set(memory_stat_unused_symbol, Number::New(stats_[i].val));
+                    stats->Set(memory_stat_unused_symbol, NanNew<Number>(it->val));
                     break;
                 case VIR_DOMAIN_MEMORY_STAT_AVAILABLE:
-                    stats->Set(memory_stat_available_symbol, Number::New(stats_[i].val));
+                    stats->Set(memory_stat_available_symbol, NanNew<Number>(it->val));
                     break;
             }
         }
-        return scope.Close(stats);
+
+        Local<Value> argv[] = { NanNull(), stats };
+
+        callback->Call(2, argv);
     }
 
-    Handle<Value> Domain::BlockPeek(const Arguments& args) {
-        HandleScope scope;
-        unsigned long long start = 0;
-		size_t size = 0;
-		char * buffer_ = NULL;
-		unsigned int flags = 0;
+    NOARGS_WORKER_METHOD(GetMemoryStats, DomainGetMemoryStatsWorker)
 
-        if(args.Length() < 3) {
+    void DomainBlockPeekWorker::Execute() {
+        if(virDomainBlockPeek(getDomainPtr(), path_.c_str(), start_, size_ , buffer_.data(), flags_) == -1) {
+            setVirError(virGetLastError());
+        }
+    }
+
+    void DomainBlockPeekWorker::HandleOKCallback() {
+        NanScope();
+
+        Local<Object> buffer = NanNewBufferHandle(buffer_.data(), size_);
+
+        Local<Value> argv[] = { NanNull(), buffer };
+
+        callback->Call(2, argv);
+    }
+
+    NAN_METHOD(Domain::BlockPeek) {
+        NanScope();
+
+        unsigned int flags = 0;
+        unsigned long long start = 0;
+        size_t size = 0;
+
+        if(args.Length() < 4) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify three arguments to invoke this function")));
+            String::New("You must specify five arguments to invoke this function")));
         }
 
         if(!args[0]->IsString()) {
@@ -2066,7 +2120,17 @@ namespace NodeLibvirt {
 
         if(!args[1]->IsNumber() || !args[2]->IsNumber()) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify numbers in the first and second argument")));
+            String::New("You must specify a number in the second and third argument")));
+        }
+
+        if(!args[3]->IsArray()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify an array in the fourth argument")));
+        }
+
+        if(!args[4]->IsFunction()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a function in the fifth argument")));
         }
 
         String::Utf8Value path(args[0]->ToString());
@@ -2074,348 +2138,510 @@ namespace NodeLibvirt {
         start = args[1]->NumberValue();
         size = args[2]->NumberValue() * sizeof(char *);
 
-        buffer_ = (char*) malloc(size);
+        //flags
+        Local<Array> flags_ = Local<Array>::Cast(args[3]);
+        unsigned int length = flags_->Length();
 
-        if(buffer_ == NULL) {
-            LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
-            return Null();
+        for (unsigned int i = 0; i < length; i++) {
+            flags |= flags_->Get(Integer::New(i))->Int32Value();
         }
-
-        memset(buffer_, 0, size);
 
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        int ret = virDomainBlockPeek(domain->domain_, (const char *) *path, start, size, buffer_, flags);
+        NanCallback *callback = new NanCallback(args[4].As<Function>());
 
-        if(ret == -1) {
-            free(buffer_);
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
+        NanAsyncQueueWorker(new DomainBlockPeekWorker(callback, domain->domain_, *path, start, size, flags));
+
+        NanReturnUndefined();
+    }
+
+    void DomainGetBlockStatsWorker::Execute() {
+        if(virDomainBlockStats(getDomainPtr(), path_.c_str(), &stats_, sizeof(stats_)) == -1) {
+            setVirError(virGetLastError());
         }
+    }
 
-        Buffer *buffer = Buffer::New(size);
-        memcpy(Buffer::Data(buffer), buffer_, size);
-        free(buffer_);
+    void DomainGetBlockStatsWorker::HandleOKCallback() {
+        NanScope();
 
-        return scope.Close(buffer->handle_);
+        Local<Object> stats = NanNew<Object>();
+
+        stats->Set(block_stat_rd_req_symbol, NanNew<Number>(stats_.rd_req));
+        stats->Set(block_stat_rd_bytes_symbol, NanNew<Number>(stats_.rd_bytes));
+        stats->Set(block_stat_wr_req_symbol, NanNew<Number>(stats_.wr_req));
+        stats->Set(block_stat_wr_bytes_symbol, NanNew<Number>(stats_.wr_bytes));
+        stats->Set(block_stat_errs_symbol, NanNew<Number>(stats_.errs));
+
+        Local<Value> argv[] = { NanNull(), stats };
+
+        callback->Call(2, argv);
     }
 
     Handle<Value> Domain::GetBlockStats(const Arguments& args) {
-        HandleScope scope;
-        int ret = -1;
-        virDomainBlockStatsStruct stats_;
+        NanScope();
 
-        if(args.Length() == 0 || !args[0]->IsString()) {
+        if(args.Length() != 2) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as argument to invoke this function")));
+            String::New("You must specify two arguments to invoke this function")));
         }
+
+        if(!args[0]->IsString()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a string as first argument")));
+        }
+
+        if(!args[1]->IsFunction()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a function as second argument")));
+        }
+
+
         String::Utf8Value path(args[0]->ToString());
 
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        ret = virDomainBlockStats(domain->domain_, (const char *) *path, &stats_, sizeof(stats_));
+        NanCallback *callback = new NanCallback(args[1].As<Function>());
 
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
+        NanAsyncQueueWorker(new DomainGetBlockStatsWorker(callback, domain->domain_, *path));
+
+        NanReturnUndefined();
+    }
+
+    void DomainGetBlockInfoWorker::Execute() {
+        unsigned int flags = 0;
+
+        if(virDomainGetBlockInfo(getDomainPtr(), path_.c_str(), &info_, flags) == -1) {
+            setVirError(virGetLastError());
         }
+    }
 
-        Local<Object> stats = Object::New();
-        stats->Set(block_stat_rd_req_symbol, Number::New(stats_.rd_req));
-        stats->Set(block_stat_rd_bytes_symbol, Number::New(stats_.rd_bytes));
-        stats->Set(block_stat_wr_req_symbol, Number::New(stats_.wr_req));
-        stats->Set(block_stat_wr_bytes_symbol, Number::New(stats_.wr_bytes));
-        stats->Set(block_stat_errs_symbol, Number::New(stats_.errs));
+    void DomainGetBlockInfoWorker::HandleOKCallback() {
+        NanScope();
 
-        return scope.Close(stats);
+        Local<Object> info = NanNew<Object>();
+
+        info->Set(block_info_capacity_symbol, NanNew<Number>(info_.capacity));
+        info->Set(block_info_allocation_symbol, NanNew<Number>(info_.allocation));
+        info->Set(block_info_physical_symbol, NanNew<Number>(info_.physical));
+
+        Local<Value> argv[] = { NanNull(), info };
+
+        callback->Call(2, argv);
     }
 
     Handle<Value> Domain::GetBlockInfo(const Arguments& args) {
-        HandleScope scope;
-        virDomainBlockInfo info_;
-        unsigned int flags = 0;
-        int ret = -1;
+        NanScope();
 
-        if(args.Length() == 0 || !args[0]->IsString()) {
+        if(args.Length() != 2) {
             return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as argument to invoke this function")));
+            String::New("You must specify two arguments to invoke this function")));
         }
+
+        if(!args[0]->IsString()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a string as first argument")));
+        }
+
+        if(!args[1]->IsFunction()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a function as second argument")));
+        }
+
+
         String::Utf8Value path(args[0]->ToString());
 
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        ret = virDomainGetBlockInfo(domain->domain_, (const char *) *path, &info_, flags);
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+        NanCallback *callback = new NanCallback(args[1].As<Function>());
 
-        Local<Object> info = Object::New();
-        info->Set(block_info_capacity_symbol, Number::New(info_.capacity));
-        info->Set(block_info_allocation_symbol, Number::New(info_.allocation));
-        info->Set(block_info_physical_symbol, Number::New(info_.physical));
+        NanAsyncQueueWorker(new DomainGetBlockInfoWorker(callback, domain->domain_, *path));
 
-        return scope.Close(info);
+        NanReturnUndefined();
     }
 
-    Handle<Value> Domain::GetInterfaceStats(const Arguments& args) {
-        HandleScope scope;
-        struct _virDomainInterfaceStats stats_;
-        int ret = -1;
+    void DomainCoreDumpWorker::Execute() {
+        int flags = 0;
 
-        if(args.Length() == 0 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as argument to invoke this function")));
+        if(virDomainCoreDump(getDomainPtr(), path_.c_str(), flags) == -1) {
+            setVirError(virGetLastError());
         }
+    }
+
+    NAN_METHOD(Domain::CoreDump) {
+        NanScope();
+
+        if(args.Length() != 2) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify two arguments to invoke this function")));
+        }
+
+        if(!args[0]->IsString()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a string as first argument")));
+        }
+
+        if(!args[1]->IsFunction()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a function as second argument")));
+        }
+
+        String::Utf8Value path(args[0]->ToString());
+
+        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+
+        NanCallback *callback = new NanCallback(args[1].As<Function>());
+
+        NanAsyncQueueWorker(new DomainCoreDumpWorker(callback, domain->domain_, *path));
+
+        NanReturnUndefined();
+    }
+
+    void DomainGetInterfaceStatsWorker::Execute() {
+        if(virDomainInterfaceStats(getDomainPtr(), device_.c_str(), &stats_, sizeof(stats_)) == -1) {
+            setVirError(virGetLastError());
+        }
+    }
+
+    void DomainGetInterfaceStatsWorker::HandleOKCallback() {
+        NanScope();
+
+        Local<Object> stats = NanNew<Object>();
+
+        stats->Set(nwiface_stat_rx_bytes_symbol, NanNew<Number>(stats_.rx_bytes));
+        stats->Set(nwiface_stat_rx_packets_symbol, NanNew<Number>(stats_.rx_packets));
+        stats->Set(nwiface_stat_rx_errors_symbol, NanNew<Number>(stats_.rx_errs));
+        stats->Set(nwiface_stat_rx_drop_symbol, NanNew<Number>(stats_.rx_drop));
+        stats->Set(nwiface_stat_tx_bytes_symbol, NanNew<Number>(stats_.tx_bytes));
+        stats->Set(nwiface_stat_tx_packets_symbol, NanNew<Number>(stats_.tx_packets));
+        stats->Set(nwiface_stat_tx_errors_symbol, NanNew<Number>(stats_.tx_errs));
+        stats->Set(nwiface_stat_tx_drop_symbol, NanNew<Number>(stats_.tx_drop));
+
+        Local<Value> argv[] = { NanNull(), stats };
+
+        callback->Call(2, argv);
+    }
+
+    NAN_METHOD(Domain::GetInterfaceStats) {
+        NanScope();
+
+        if(args.Length() != 2) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify two arguments to invoke this function")));
+        }
+
+        if(!args[0]->IsString()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a string as first argument")));
+        }
+
+        if(!args[1]->IsFunction()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a function as second argument")));
+        }
+
         String::Utf8Value device(args[0]->ToString());
 
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        ret = virDomainInterfaceStats(domain->domain_, (const char *) *device, &stats_, sizeof(stats_));
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
+        NanCallback *callback = new NanCallback(args[1].As<Function>());
 
-        Local<Object> stats = Object::New();
-        stats->Set(nwiface_stat_rx_bytes_symbol, Number::New(stats_.rx_bytes));
-        stats->Set(nwiface_stat_rx_packets_symbol, Number::New(stats_.rx_packets));
-        stats->Set(nwiface_stat_rx_errors_symbol, Number::New(stats_.rx_errs));
-        stats->Set(nwiface_stat_rx_drop_symbol, Number::New(stats_.rx_drop));
-        stats->Set(nwiface_stat_tx_bytes_symbol, Number::New(stats_.tx_bytes));
-        stats->Set(nwiface_stat_tx_packets_symbol, Number::New(stats_.tx_packets));
-        stats->Set(nwiface_stat_tx_errors_symbol, Number::New(stats_.tx_errs));
-        stats->Set(nwiface_stat_tx_drop_symbol, Number::New(stats_.tx_drop));
+        NanAsyncQueueWorker(new DomainGetInterfaceStatsWorker(callback, domain->domain_, *device));
 
-        return scope.Close(stats);
+        NanReturnUndefined();
     }
 
-    Handle<Value> Domain::CoreDump(const Arguments& args) {
-        HandleScope scope;
-        int flags = 0;
-        int ret = -1;
-
-        if(args.Length() == 0 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as argument to invoke this function")));
-        }
-        String::Utf8Value path(args[0]->ToString());
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        ret = virDomainCoreDump(domain->domain_, (const char *) *path, flags);
-
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
-
-        return True();
-    }
-
-    Handle<Value> Domain::HasCurrentSnapshot(const Arguments& args) {
-        HandleScope scope;
+    void DomainHasCurrentSnapshotWorker::Execute() {
         unsigned int flags = 0;
         int ret = -1;
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
+        ret = virDomainHasCurrentSnapshot(getDomainPtr(), flags);
 
-        ret = virDomainHasCurrentSnapshot(domain->domain_, flags);
-        if(ret == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
+        if (ret == -1) {
+            setVirError(virGetLastError());
+            return;
         }
 
-        return ret == 1 ? True() : False();
+        setVal(ret == 1 ? true : false);
     }
 
-    Handle<Value> Domain::RevertToSnapshot(const Arguments& args) {
-        HandleScope scope;
+    NOARGS_WORKER_METHOD(HasCurrentSnapshot, DomainHasCurrentSnapshotWorker)
+
+    void DomainRevertToSnapshotWorker::Execute() {
         virDomainSnapshotPtr snapshot = NULL;
         unsigned int flags = 0;
         int ret = -1;
 
-        if(args.Length() == 0 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as argument to invoke this function")));
-        }
-        String::Utf8Value name(args[0]->ToString());
-
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-        snapshot = virDomainSnapshotLookupByName(domain->domain_, (const char *) *name, flags);
+        snapshot = virDomainSnapshotLookupByName(getDomainPtr(), name_.c_str(), flags);
         if(snapshot == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
+            setVirError(virGetLastError());
+            return;
         }
 
         ret = virDomainRevertToSnapshot(snapshot, flags);
 
         if(ret == -1) {
-            virDomainSnapshotFree(snapshot);
-            ThrowException(Error::New(virGetLastError()));
-            return False();
+            setVirError(virGetLastError());
         }
-        virDomainSnapshotFree(snapshot);
 
-        return True();
+        virDomainSnapshotFree(snapshot);
     }
 
-    Handle<Value> Domain::TakeSnapshot(const Arguments& args) {
-        HandleScope scope;
-        virDomainSnapshotPtr snapshot = NULL;
-        unsigned int flags = 0;
+    NAN_METHOD(Domain::RevertToSnapshot) {
+        NanScope();
+
+        if(args.Length() != 2) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify two arguments to invoke this function")));
+        }
+
+        if(!args[0]->IsString()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a string as first argument")));
+        }
+
+        if(!args[1]->IsFunction()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a function as second argument")));
+        }
+
+        String::Utf8Value name(args[0]->ToString());
 
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
 
-        if(args.Length() == 1 && args[0]->IsString()) {
-            String::Utf8Value xml(args[0]->ToString());
-            snapshot = virDomainSnapshotCreateXML(domain->domain_, (const char *) *xml, flags);
+        NanCallback *callback = new NanCallback(args[1].As<Function>());
+
+        NanAsyncQueueWorker(new DomainRevertToSnapshotWorker(callback, domain->domain_, *name));
+
+        NanReturnUndefined();
+    }
+
+    void DomainTakeSnapshotWorker::Execute() {
+        virDomainSnapshotPtr snapshot = NULL;
+        unsigned int flags = 0;
+
+        if(xml_.length() > 0) {
+            snapshot = virDomainSnapshotCreateXML(getDomainPtr(), xml_.c_str(), flags);
         } else {
-            snapshot = virDomainSnapshotCurrent(domain->domain_, flags);
+            snapshot = virDomainSnapshotCurrent(getDomainPtr(), flags);
         }
 
         if(snapshot == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
+            setVirError(virGetLastError());
+            return;
         }
-        virDomainSnapshotFree(snapshot);
 
-        return True();
+        virDomainSnapshotFree(snapshot);
     }
 
-    Handle<Value> Domain::GetCurrentSnapshot(const Arguments& args) {
-        HandleScope scope;
-        unsigned int flags = 0;
-        virDomainSnapshotPtr snapshot = NULL;
-        char* xml_ = NULL;
+    NAN_METHOD(Domain::TakeSnapshot) {
+        NanScope();
+
+        if(args.Length() != 1 && args.Length() != 2) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify one or two arguments to invoke this function")));
+        }
 
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-        snapshot = virDomainSnapshotCurrent(domain->domain_, flags);
+        DomainTakeSnapshotWorker *worker;
 
-        if(snapshot == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
+        if(args.Length() == 2) {
+            if(!args[0]->IsString()) {
+                return ThrowException(Exception::TypeError(
+                String::New("You must specify a string as first argument")));
+            }
+
+            if(!args[1]->IsFunction()) {
+                return ThrowException(Exception::TypeError(
+                String::New("You must specify a function as second argument")));
+            }
+
+            String::Utf8Value xml(args[0]->ToString());
+            NanCallback *callback = new NanCallback(args[1].As<Function>());
+            worker = new DomainTakeSnapshotWorker(callback, domain->domain_, *xml);
+
+        } else {
+            if(!args[0]->IsFunction()) {
+                return ThrowException(Exception::TypeError(
+                String::New("You must specify a function as second argument")));
+            }
+
+            NanCallback *callback = new NanCallback(args[0].As<Function>());
+            worker = new DomainTakeSnapshotWorker(callback, domain->domain_);
         }
 
-        xml_ = virDomainSnapshotGetXMLDesc(snapshot, flags);
-        if(xml_ == NULL) {
-            virDomainSnapshotFree(snapshot);
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-        virDomainSnapshotFree(snapshot);
-        //TODO serialize to json
+        NanAsyncQueueWorker(worker);
 
-        Local<String> xml = String::New(xml_);
-        free(xml_);
-
-        return scope.Close(xml);
+        NanReturnUndefined();
     }
 
-    Handle<Value> Domain::DeleteSnapshot(const Arguments& args) {
-        HandleScope scope;
+    void DomainGetCurrentSnapshotWorker::Execute() {
+        unsigned int flags = 0;
+        virDomainSnapshotPtr snapshot = NULL;
+        char* xml = NULL;
+
+        snapshot = virDomainSnapshotCurrent(getDomainPtr(), flags);
+
+        if(snapshot == NULL) {
+            setVirError(virGetLastError());
+            return;
+        }
+
+        xml = virDomainSnapshotGetXMLDesc(snapshot, flags);
+
+        if(xml == NULL) {
+            virDomainSnapshotFree(snapshot);
+            setVirError(virGetLastError());
+            return;
+        }
+
+        virDomainSnapshotFree(snapshot);
+        setVal(xml);
+    }
+
+    NOARGS_WORKER_METHOD(GetCurrentSnapshot, DomainGetCurrentSnapshotWorker)
+
+    void DomainDeleteSnapshotWorker::Execute() {
         unsigned int flags = 0;
         virDomainSnapshotPtr snapshot = NULL;
 
-        if(args.Length() == 0 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as argument to invoke this function")));
+        snapshot = virDomainSnapshotLookupByName(getDomainPtr(), name_.c_str(), flags);
+
+        if(snapshot == NULL) {
+            setVirError(virGetLastError());
+            return;
         }
+
+        if(virDomainSnapshotDelete(snapshot, flags) == -1) {
+            setVirError(virGetLastError());
+        }
+
+        virDomainSnapshotFree(snapshot);
+    }
+
+    NAN_METHOD(Domain::DeleteSnapshot) {
+        NanScope();
+
+        if(args.Length() != 2) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify two arguments to invoke this function")));
+        }
+
+        if(!args[0]->IsString()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a string as first argument")));
+        }
+
+        if(!args[1]->IsFunction()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a function as second argument")));
+        }
+
         String::Utf8Value name(args[0]->ToString());
 
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-        snapshot = virDomainSnapshotLookupByName(domain->domain_, (const char *) *name, flags);
-        if(snapshot == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
 
-        int ret = virDomainSnapshotDelete(snapshot, flags);
-        if(ret == -1) {
-            virDomainSnapshotFree(snapshot);
-            ThrowException(Error::New(virGetLastError()));
-            return False();
-        }
-        virDomainSnapshotFree(snapshot);
+        NanCallback *callback = new NanCallback(args[1].As<Function>());
 
-        return True();
+        NanAsyncQueueWorker(new DomainDeleteSnapshotWorker(callback, domain->domain_, *name));
+
+        NanReturnUndefined();
     }
 
-    Handle<Value> Domain::LookupSnapshotByName(const Arguments& args) {
-        HandleScope scope;
-        char* xml_ = NULL;
+    void DomainLookupSnapshotByNameWorker::Execute() {
         unsigned int flags = 0;
         virDomainSnapshotPtr snapshot = NULL;
+        char* xml = NULL;
 
-        if(args.Length() == 0 || !args[0]->IsString()) {
-            return ThrowException(Exception::TypeError(
-            String::New("You must specify a string as argument to invoke this function")));
+        snapshot = virDomainSnapshotLookupByName(getDomainPtr(), name_.c_str(), flags);
+
+        if(snapshot == NULL) {
+            setVirError(virGetLastError());
+            return;
         }
+
+        xml = virDomainSnapshotGetXMLDesc(snapshot, flags);
+
+        if(xml == NULL) {
+            virDomainSnapshotFree(snapshot);
+            setVirError(virGetLastError());
+            return;
+        }
+
+        virDomainSnapshotFree(snapshot);
+        setVal(xml);
+    }
+
+    NAN_METHOD(Domain::LookupSnapshotByName) {
+        NanScope();
+
+        if(args.Length() != 2) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify two arguments to invoke this function")));
+        }
+
+        if(!args[0]->IsString()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a string as first argument")));
+        }
+
+        if(!args[1]->IsFunction()) {
+            return ThrowException(Exception::TypeError(
+            String::New("You must specify a function as second argument")));
+        }
+
         String::Utf8Value name(args[0]->ToString());
 
         Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-        snapshot = virDomainSnapshotLookupByName(domain->domain_, (const char *) *name, flags);
-        if(snapshot == NULL) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
 
-        xml_ = virDomainSnapshotGetXMLDesc(snapshot, flags);
-        if(xml_ == NULL) {
-            virDomainSnapshotFree(snapshot);
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-        virDomainSnapshotFree(snapshot);
-        //TODO serialize to json
+        NanCallback *callback = new NanCallback(args[1].As<Function>());
 
-        Local<String> xml = String::New(xml_);
-        free(xml_);
+        NanAsyncQueueWorker(new DomainLookupSnapshotByNameWorker(callback, domain->domain_, *name));
 
-        return scope.Close(xml);
+        NanReturnUndefined();
     }
 
-    Handle<Value> Domain::GetSnapshots(const Arguments& args) {
-        HandleScope scope;
-        char **snapshots_ = NULL;
+    void DomainGetSnapshotsWorker::Execute() {
         unsigned int flags = 0;
         int num_snapshots = 0;
 
-        Domain *domain = ObjectWrap::Unwrap<Domain>(args.This());
-
-        num_snapshots = virDomainSnapshotNum(domain->domain_, flags);
-
+        num_snapshots = virDomainSnapshotNum(getDomainPtr(), flags);
         if(num_snapshots == -1) {
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
+            setVirError(virGetLastError());
+            return;
         }
 
-        snapshots_ = (char**) malloc(sizeof(*snapshots_) * num_snapshots);
-        if(snapshots_ == NULL) {
-            LIBVIRT_THROW_EXCEPTION("unable to allocate memory");
-            return Null();
+        std::vector<char*> names(num_snapshots);
+
+        if(virDomainSnapshotListNames(getDomainPtr(), names.data(), num_snapshots, flags) == -1) {
+            setVirError(virGetLastError());
+            return;
         }
 
-        num_snapshots = virDomainSnapshotListNames(domain->domain_, snapshots_, num_snapshots, flags);
-        if(num_snapshots == -1) {
-            free(snapshots_);
-            ThrowException(Error::New(virGetLastError()));
-            return Null();
-        }
-
-        Local<Array> snapshots = Array::New(num_snapshots);
-        for (int i = 0; i < num_snapshots; i++) {
-            virDomainSnapshotPtr snapshot = virDomainSnapshotLookupByName(domain->domain_, snapshots_[i], flags);
+        for (std::vector<char*>::iterator it = names.begin() ; it != names.end(); ++it) {
+            virDomainSnapshotPtr snapshot = virDomainSnapshotLookupByName(getDomainPtr(), *it, flags);
             char *xml = virDomainSnapshotGetXMLDesc(snapshot, flags);
-            virDomainSnapshotFree(snapshot);
 
-            snapshots->Set(Integer::New(i), String::New(xml));
-            free(snapshots_[i]);
+            xmls_.push_back(xml);
+            virDomainSnapshotFree(snapshot);
             free(xml);
         }
-        free(snapshots_);
-
-        return scope.Close(snapshots);
     }
+
+    void DomainGetSnapshotsWorker::HandleOKCallback() {
+        NanScope();
+
+        Local<Array> snapshots = Array::New(xmls_.size());
+        int i = 0;
+
+        for (std::vector<std::string>::iterator it = xmls_.begin() ; it != xmls_.end(); ++it) {
+            snapshots->Set(NanNew<Integer>(i++), NanNew<String>(it->c_str()));
+        }
+
+        Local<Value> argv[] = { NanNull(), snapshots };
+
+        callback->Call(2, argv);
+    }
+
+    NOARGS_WORKER_METHOD(GetSnapshots, DomainGetSnapshotsWorker)
 
 } //namespace NodeLibvirt

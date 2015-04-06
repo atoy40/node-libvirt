@@ -72,29 +72,29 @@ namespace NodeLibvirt {
             static NAN_METHOD(DetachDevice);
             static NAN_METHOD(UpdateDevice);
             static NAN_METHOD(ToXml);
-            static Handle<Value> GetJobInfo(const Arguments& args);
-            static Handle<Value> AbortCurrentJob(const Arguments& args);
-            static Handle<Value> GetSchedType(const Arguments& args);
-            static Handle<Value> GetSchedParams(const Arguments& args);
-            static Handle<Value> SetSchedParams(const Arguments& args);
-            static Handle<Value> GetSecurityLabel(const Arguments& args);
-            static Handle<Value> SaveManagedImage(const Arguments& args);
-            static Handle<Value> RemoveManagedImage(const Arguments& args);
-            static Handle<Value> HasManagedImage(const Arguments& args);
-            static Handle<Value> MemoryPeek(const Arguments& args);
-            static Handle<Value> GetMemoryStats(const Arguments& args);
-            static Handle<Value> BlockPeek(const Arguments& args);
-            static Handle<Value> GetBlockStats(const Arguments& args);
-            static Handle<Value> GetBlockInfo(const Arguments& args);
-            static Handle<Value> CoreDump(const Arguments& args);
-            static Handle<Value> GetInterfaceStats(const Arguments& args);
-            static Handle<Value> HasCurrentSnapshot(const Arguments& args);
-            static Handle<Value> RevertToSnapshot(const Arguments& args);
-            static Handle<Value> TakeSnapshot(const Arguments& args);
-            static Handle<Value> GetCurrentSnapshot(const Arguments& args);
-            static Handle<Value> DeleteSnapshot(const Arguments& args);
-            static Handle<Value> LookupSnapshotByName(const Arguments& args);
-            static Handle<Value> GetSnapshots(const Arguments& args);
+            static NAN_METHOD(GetJobInfo);
+            static NAN_METHOD(AbortCurrentJob);
+            static NAN_METHOD(GetSchedType); // TODO
+            static NAN_METHOD(GetSchedParams);
+            static NAN_METHOD(SetSchedParams);
+            static NAN_METHOD(GetSecurityLabel);
+            static NAN_METHOD(SaveManagedImage);
+            static NAN_METHOD(RemoveManagedImage);
+            static NAN_METHOD(HasManagedImage);
+            static NAN_METHOD(MemoryPeek);
+            static NAN_METHOD(GetMemoryStats);
+            static NAN_METHOD(BlockPeek);
+            static NAN_METHOD(GetBlockStats);
+            static NAN_METHOD(GetBlockInfo);
+            static NAN_METHOD(CoreDump);
+            static NAN_METHOD(GetInterfaceStats);
+            static NAN_METHOD(HasCurrentSnapshot);
+            static NAN_METHOD(RevertToSnapshot);
+            static NAN_METHOD(TakeSnapshot);
+            static NAN_METHOD(GetCurrentSnapshot);
+            static NAN_METHOD(DeleteSnapshot);
+            static NAN_METHOD(LookupSnapshotByName);
+            static NAN_METHOD(GetSnapshots);
 
         private:
             virDomainPtr domain_;
@@ -443,6 +443,223 @@ namespace NodeLibvirt {
             void Execute();
         private:
             int flags_;
+    };
+
+    class DomainGetJobInfoWorker : public DomainWorker {
+        public:
+            DomainGetJobInfoWorker(NanCallback *callback, virDomainPtr domainptr)
+                : DomainWorker(callback, domainptr) {}
+            void Execute();
+        protected:
+            void HandleOKCallback();
+        private:
+            virDomainJobInfo info_;
+    };
+
+    class DomainAbortCurrentJobWorker : public DomainWorker {
+        public:
+            DomainAbortCurrentJobWorker(NanCallback *callback, virDomainPtr domainptr)
+                : DomainWorker(callback, domainptr) {}
+            void Execute();
+    };
+
+    class DomainGetSchedParamsWorker : public DomainWorker {
+        public:
+            DomainGetSchedParamsWorker(NanCallback *callback, virDomainPtr domainptr)
+                : DomainWorker(callback, domainptr) {}
+            void Execute();
+        protected:
+            void HandleOKCallback();
+        private:
+            std::vector<virSchedParameter> params_;
+    };
+
+    class DomainSetSchedParamsWorker : public DomainWorker {
+        public:
+            DomainSetSchedParamsWorker(NanCallback *callback, virDomainPtr domainptr, Handle<Object> newparams);
+            void Execute();
+        private:
+            std::vector<virSchedParameter> newparams_;
+    };
+
+    class DomainGetSecurityLabelWorker : public DomainWorker {
+        public:
+            DomainGetSecurityLabelWorker(NanCallback *callback, virDomainPtr domainptr)
+                : DomainWorker(callback, domainptr) {}
+            void Execute();
+        protected:
+            void HandleOKCallback();
+        private:
+            virSecurityLabel label_;
+    };
+
+    class DomainSaveManagedImageWorker : public DomainWorker {
+        public:
+            DomainSaveManagedImageWorker(NanCallback *callback, virDomainPtr domainptr)
+                : DomainWorker(callback, domainptr) {}
+            void Execute();
+    };
+
+    class DomainRemoveManagedImageWorker : public DomainWorker {
+        public:
+            DomainRemoveManagedImageWorker(NanCallback *callback, virDomainPtr domainptr)
+                : DomainWorker(callback, domainptr) {}
+            void Execute();
+    };
+
+    class DomainHasManagedImageWorker : public BooleanReturnWorker<DomainWorker, virDomainPtr> {
+        public:
+            DomainHasManagedImageWorker(NanCallback *callback, virDomainPtr domainptr)
+                : BooleanReturnWorker(callback, domainptr) {}
+            void Execute();
+    };
+
+    class DomainMemoryPeekWorker : public DomainWorker {
+        public:
+            DomainMemoryPeekWorker(NanCallback *callback, virDomainPtr domainptr, unsigned long long start, size_t size, unsigned int flags)
+                : DomainWorker(callback, domainptr), start_(start), size_(size), flags_(flags), buffer_(size) {}
+            void Execute();
+        protected:
+            void HandleOKCallback();
+        private:
+            unsigned long long start_;
+            size_t size_;
+            unsigned int flags_;
+            std::vector<char> buffer_;
+    };
+
+    class DomainGetMemoryStatsWorker : public DomainWorker {
+        public:
+            DomainGetMemoryStatsWorker(NanCallback *callback, virDomainPtr domainptr)
+                : DomainWorker(callback, domainptr), stats_(VIR_DOMAIN_MEMORY_STAT_NR) {}
+            void Execute();
+        protected:
+            void HandleOKCallback();
+        private:
+            std::vector<virDomainMemoryStatStruct> stats_;
+    };
+
+    class DomainBlockPeekWorker : public DomainWorker {
+        public:
+            DomainBlockPeekWorker(NanCallback *callback, virDomainPtr domainptr, const char *path, unsigned long long start, size_t size, unsigned int flags)
+                : DomainWorker(callback, domainptr), path_(path), start_(start), size_(size), flags_(flags), buffer_(size) {}
+            void Execute();
+        protected:
+            void HandleOKCallback();
+        private:
+            std::string path_;
+            unsigned long long start_;
+            size_t size_;
+            unsigned int flags_;
+            std::vector<char> buffer_;
+    };
+
+    class DomainGetBlockStatsWorker : public DomainWorker {
+        public:
+            DomainGetBlockStatsWorker(NanCallback *callback, virDomainPtr domainptr, const char *path)
+                : DomainWorker(callback, domainptr), path_(path) {}
+            void Execute();
+        protected:
+            void HandleOKCallback();
+        private:
+            std::string path_;
+            virDomainBlockStatsStruct stats_;
+    };
+
+    class DomainGetBlockInfoWorker : public DomainWorker {
+        public:
+            DomainGetBlockInfoWorker(NanCallback *callback, virDomainPtr domainptr, const char *path)
+                : DomainWorker(callback, domainptr), path_(path) {}
+            void Execute();
+        protected:
+            void HandleOKCallback();
+        private:
+            std::string path_;
+            virDomainBlockInfo info_;
+    };
+
+    class DomainCoreDumpWorker : public DomainWorker {
+        public:
+            DomainCoreDumpWorker(NanCallback *callback, virDomainPtr domainptr, const char *path)
+                : DomainWorker(callback, domainptr), path_(path) {}
+            void Execute();
+        private:
+            std::string path_;
+    };
+
+    class DomainGetInterfaceStatsWorker : public DomainWorker {
+        public:
+            DomainGetInterfaceStatsWorker(NanCallback *callback, virDomainPtr domainptr, const char *device)
+                : DomainWorker(callback, domainptr), device_(device) {}
+            void Execute();
+        protected:
+            void HandleOKCallback();
+        private:
+            std::string device_;
+            struct _virDomainInterfaceStats stats_;
+    };
+
+    class DomainHasCurrentSnapshotWorker : public BooleanReturnWorker<DomainWorker, virDomainPtr> {
+        public:
+            DomainHasCurrentSnapshotWorker(NanCallback *callback, virDomainPtr domainptr)
+                : BooleanReturnWorker(callback, domainptr) {}
+            void Execute();
+    };
+
+    class DomainRevertToSnapshotWorker : public DomainWorker {
+        public:
+            DomainRevertToSnapshotWorker(NanCallback *callback, virDomainPtr domainptr, const char *name)
+                : DomainWorker(callback, domainptr), name_(name) {}
+            void Execute();
+        private:
+            std::string name_;
+    };
+
+    class DomainTakeSnapshotWorker : public DomainWorker {
+        public:
+            DomainTakeSnapshotWorker(NanCallback *callback, virDomainPtr domainptr, const char *xml)
+                : DomainWorker(callback, domainptr), xml_(xml) {}
+            DomainTakeSnapshotWorker(NanCallback *callback, virDomainPtr domainptr)
+                : DomainWorker(callback, domainptr) {}
+            void Execute();
+        private:
+            std::string xml_;
+    };
+
+    class DomainGetCurrentSnapshotWorker : public StringReturnWorker<DomainWorker, virDomainPtr> {
+        public:
+            DomainGetCurrentSnapshotWorker(NanCallback *callback, virDomainPtr domainptr)
+                : StringReturnWorker(callback, domainptr) {}
+            void Execute();
+    };
+
+    class DomainDeleteSnapshotWorker : public DomainWorker {
+        public:
+            DomainDeleteSnapshotWorker(NanCallback *callback, virDomainPtr domainptr, const char *name)
+                : DomainWorker(callback, domainptr), name_(name) {}
+            void Execute();
+        private:
+            std::string name_;
+    };
+
+    class DomainLookupSnapshotByNameWorker : public StringReturnWorker<DomainWorker, virDomainPtr> {
+        public:
+            DomainLookupSnapshotByNameWorker(NanCallback *callback, virDomainPtr domainptr, const char *name)
+                : StringReturnWorker(callback, domainptr), name_(name) {}
+            void Execute();
+        private:
+            std::string name_;
+    };
+
+    class DomainGetSnapshotsWorker : public DomainWorker {
+        public:
+            DomainGetSnapshotsWorker(NanCallback *callback, virDomainPtr domainptr)
+                : DomainWorker(callback, domainptr) {}
+            void Execute();
+        protected:
+            void HandleOKCallback();
+        private:
+            std::vector<std::string> xmls_;
     };
 
 }  //namespace NodeLibvirt

@@ -290,8 +290,9 @@ describe('Domain', function() {
                     bandwidth: 100,
                     flags: flags
                 }, function(err, domain) {
-                    should.exists(err);
-                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT)
+                    if (err) {
+                        err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                    }
                     done();
                 });
             });
@@ -310,8 +311,18 @@ describe('Domain', function() {
                 bandwidth: 100,
                 flags: flags
             }, function(err) {
-                should.exists(err);
-                err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT)
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                }
+                done();
+            });
+        });
+
+        it('should set a maximum tolerable time for which the domain is allowed to be paused at the end of live migration', function(done) {
+            domain.setMigrationMaxDowntime(100000, function(err) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                }
                 done();
             });
         });
@@ -336,8 +347,9 @@ describe('Domain', function() {
 
             //no supported by test driver
             domain.attachDevice(xml, function(err) {
-                should.exists(err);
-                err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT)
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                }
                 done();
             });
         });
@@ -347,8 +359,9 @@ describe('Domain', function() {
 
             //no supported by test driver
             domain.detachDevice(xml, function(err) {
-                should.exists(err);
-                err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT)
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                }
                 done();
             });
         });
@@ -359,8 +372,302 @@ describe('Domain', function() {
 
             //no supported by test driver
             domain.updateDevice(xml, flags, function(err) {
-                should.exists(err);
-                err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT)
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                }
+                done();
+            });
+        });
+
+        it('should return domain xml representation', function(done) {
+            var flags = [libvirt.VIR_DOMAIN_XML_SECURE,
+                libvirt.VIR_DOMAIN_XML_INACTIVE
+            ];
+
+            //no supported by test driver
+            domain.toXml(flags, function(err, res) {
+                if (err) return done(err);
+                res.should.match(/<name>test<\/name>/);
+                done();
+            });
+        });
+
+        it('should extract information about progress of a background job on the domain', function(done) {
+            //no supported by test driver
+            domain.getJobInfo(function(err, res) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                } else {
+                    res.should.be.Object;
+                    res.should.have.keys('type', 'time', 'data', 'memory', 'file');
+                }
+                done();
+            });
+        });
+
+        it('should abort the current background job on the domain', function(done) {
+            //no supported by test driver
+            domain.abortCurrentJob(function(err) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                    return done();
+                }
+                done();
+            });
+        });
+
+        it('should get the domain scheduler parameters', function(done) {
+            //no supported by test driver
+            domain.getSchedParams(function(err, res) {
+                if (err) return done(err);
+                should.exists(res);
+                res.should.be.Object;
+                res.weight.should.be.equal(50);
+                done();
+            });
+        });
+
+        // TODO setSchedParams
+
+        it('should return the domain security labels', function(done) {
+            //no supported by test driver
+            domain.getSecurityLabel(function(err, res) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                } else {
+                    res.should.be.Object;
+                    res.should.have.keys('label', 'enforcing');
+                }
+                done();
+            });
+        });
+
+        it('should save a managed image of the domain', function(done) {
+            //no supported by test driver
+            domain.saveManagedImage(function(err) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                }
+                domain.hasManagedImage(function(err, res) {
+                    if (err) {
+                        err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                    } else {
+                        res.should.be.true;
+                    }
+                    done();
+                });
+            });
+        });
+
+        it('should remove a managed image of the domain', function(done) {
+            //no supported by test driver
+            domain.removeManagedImage(function(err) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                }
+                domain.hasManagedImage(function(err, res) {
+                    if (err) {
+                        err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                    } else {
+                        res.should.be.false;
+                    }
+                    done();
+                });
+            });
+        });
+
+        it('should allow to read the domain\'s memory content and return it in a Buffer object', function(done) {
+            var physical = [domain.VIR_MEMORY_PHYSICAL];
+            var virtual = [domain.VIR_MEMORY_VIRTUAL];
+
+            //no supported by test driver
+            domain.memoryPeek(0, 1024, physical, function(err, res) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                } else {
+                    should.exists(res);
+                    res.should.be.instanceof(Buffer);
+                }
+                domain.memoryPeek(0, 1024, virtual, function(err, res) {
+                    if (err) {
+                        err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                        return done();
+                    } else {
+                        should.exists(res);
+                        res.should.be.instanceof(Buffer);
+                    }
+                    return done();
+                });
+            });
+        });
+
+        it('should return domain\'s memory statistics', function(done) {
+            //no supported by test driver
+            domain.getMemoryStats(function(err, res) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                } else {
+                    res.should.be.Object;
+                    res.should.have.keys('swap_in', 'swap_out', 'major_fault', 'minor_fault', 'unused', 'available');
+                }
+                done();
+            });
+        });
+
+        it('should allow to read the content of a domain\'s disk device and return it in a Buffer object', function(done) {
+            //no supported by test driver
+            domain.blockPeek('/dev/sda', 0, 1024, [], function(err, res) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                } else {
+                    should.exists(res);
+                    res.should.be.instanceof(Buffer);
+                }
+                done();
+            });
+        });
+
+        it('should return block device stats for block devices attached to the domain', function(done) {
+            //no supported by test driver
+            domain.getBlockStats('/dev/sda', function(err, res) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_INVALID_ARG);
+                } else {
+                    res.should.be.Object;
+                    res.should.have.keys('read_requests', 'read_bytes', 'write_requests', 'write_bytes');
+                }
+                done();
+            });
+        });
+
+        it('should return basic information about a domain\'s block device', function(done) {
+            //no supported by test driver
+            domain.getBlockInfo('/path', function(err, res) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                } else {
+                    res.should.be.Object;
+                    res.should.have.keys('capacity', 'allocation', 'physical');
+                }
+                done();
+            });
+        });
+
+        it('should dump the core of a domain on a given file for analysis', function(done) {
+            //no supported by test driver
+            domain.coreDump('/tmp/dumpcore-test.txt', function(err) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                }
+                done();
+            });
+        });
+
+        it('should return network interface statistics of the domain', function(done) {
+            //no supported by test driver
+            domain.getInterfaceStats('eth1', function(err, res) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_INVALID_ARG);
+                } else {
+                    res.should.be.Object;
+                    res.should.have.keys('rx_bytes', 'rx_packets', 'rx_errors', 'rx_drop', 'tx_bytes', 'tx_packets', 'tx_errors', 'tx_drop');
+                }
+                done();
+            });
+        });
+
+        it('should show if the domain has a current snapshot', function(done) {
+            domain.hasCurrentSnapshot(function(err, res) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                } else {
+                    res.should.be.false;
+                }
+                done();
+            });
+        });
+
+        it('should take a snapshot of the domain', function(done) {
+            var xml = fixture('snapshot.xml');
+            domain.takeSnapshot(xml, function(err) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                }
+                done();
+            });
+        });
+
+        it('should show if the domain has now a current snapshot', function(done) {
+            domain.hasCurrentSnapshot(function(err, res) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                } else {
+                    res.should.be.true;
+                }
+                done();
+            });
+        });
+
+        it('should get the current snapshot', function(done) {
+            domain.getCurrentSnapshot(function(err, res) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                } else {
+                    res.should.match(/<name>test-snapshot<\/name>/);
+                }
+                done();
+            });
+        });
+
+        it('should lookup a snapshot by name', function(done) {
+            domain.lookupSnapshotByName('test-snapshot', function(err, res) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                } else {
+                    res.should.match(/<name>test-snapshot<\/name>/);
+                }
+                done();
+            });
+        });
+
+        it('should revert the domain to a snapshot taken before', function(done) {
+            domain.revertToSnapshot('test-snapshot', function(err) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                }
+                done();
+            });
+        });
+
+        it('should return all the domain snapshots', function(done) {
+            domain.getSnapshots(function(err, res) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                } else {
+                    res.should.be.Array;
+                    res.should.have.length(1);
+                    res[0].should.match(/<name>test-snapshot<\/name>/);
+                }
+                done();
+            });
+        });
+
+        it('should delete a snapshot', function(done) {
+            domain.deleteSnapshot('test-snapshot', function(err) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                }
+                done();
+            });
+        });
+
+        it('should show if the domain current snapshot has been deleted', function(done) {
+            domain.hasCurrentSnapshot(function(err, res) {
+                if (err) {
+                    err.code.should.be.equal(err.VIR_ERR_NO_SUPPORT);
+                } else {
+                    res.should.be.false;
+                }
                 done();
             });
         });
